@@ -40,10 +40,11 @@ class TestTransaction_MonitoringLocal(TestCase):
             print(new_sheet)
             return new_sheet
         srv._update_sliding_window(new_sheet,7)
+        rules = srv._get_rules()
         
-        single_transfer=srv._generated_alerts("single")
-        sum_recieved=srv._generated_alerts("sum_recieved")
-        exchanged_amount=srv._generated_alerts("exchange")
+        single_transfer=srv._generated_alerts(rules,"single")
+        sum_recieved=srv._generated_alerts(rules,"sum_recieved")
+        exchanged_amount=srv._generated_alerts(rules,"exchange")
         
         screening = srv._build_results([single_transfer,sum_recieved,exchanged_amount])
         

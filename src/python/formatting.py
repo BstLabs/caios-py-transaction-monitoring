@@ -13,10 +13,10 @@ def get_types() -> dict:
         "exchange" : "exchange"
     }
 
-def format_process(func: Callable, violation_type: str) -> Callable:
+def format_process(func: Callable, rules: jdict, violation_type: str) -> Callable:
     """ Wraps the search function for parallel call """
     async def process():
-        result = func(violation_type)
+        result = func(rules, violation_type)
         return result
     return process
 

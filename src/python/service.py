@@ -5,7 +5,7 @@ from jdict import jdict
 import warnings
 from caios.protocol.channel import Channel
 from formatting import get_types, format_process, format_transaction_data, format_ss_name, format_alert, format_email, format_alert_filename
-from domain_logic import past_date, get_recent_data, refresh_data, detect_limit_violations, build_results
+from domain_logic import past_date, get_recent_data, refresh_data, extract_rules, detect_limit_violations, build_results
 
 class TransactionMonitoring:
     """Demonstrates simple function creation using CAIOS"""
@@ -20,14 +20,14 @@ class TransactionMonitoring:
             :return: None
         """
         
-        self._spreadsheet = Mapping.get_mapping(transactions)
-        self._transactions = MutableMapping.get_mapping(service_storage)
+        self._transactions = Mapping.get_mapping(transactions)
+        self._data_for_screening = MutableMapping.get_mapping(service_storage)
         self._alerts = MutableMapping.get_mapping(alerts_storage)
         self._email_channel = Channel.get_channel(notification_mail)
     
     def _prepare_data(self, window_length: int = 7) -> None:
-        ''' create and store a dataframe with transactions from past days '''
-        self._transactions['transactions'] = format_transaction_data(self._spreadsheet, window_length)
+        ''' Create and store a dataframe with transactions from past days '''
+        self._data_for_screening['transactions'] = format_transaction_data(self._transactions, window_length)
       
     async def _check_transactions(self, recipient: str, window_length: int) -> str:
         ''' Transaction monitoring workflow
@@ -40,11 +40,12 @@ class TransactionMonitoring:
             
         self._update_sliding_window(new_sheet, window_length)
         
+        rules = self._get_rules()
         types = self._get_types()
         violations = await gather(
-            format_process(self._generated_alerts,types.single)(),
-            format_process(self._generated_alerts,types.sum_recieved)(),
-            format_process(self._generated_alerts,types.exchange)()
+            format_process(self._generated_alerts,rules,types.single)(),
+            format_process(self._generated_alerts,rules,types.sum_recieved)(),
+            format_process(self._generated_alerts,rules,types.exchange)()
         )
         screening = self._build_results(violations)
         
@@ -57,33 +58,37 @@ class TransactionMonitoring:
     def _check_new_data(self) -> str:
         ''' Check if yesterday's data is available in the spreadsheet '''
         sheet = format_ss_name(0)
-        if sheet not in self._spreadsheet:
+        if sheet not in self._transactions:
             return "No new data"
         
         return sheet
             
     def _update_sliding_window(self, sheet: str, window_length: int) -> None:
         ''' Refresh file with transactions from past days '''
-        old_data = self._transactions["transactions"]
+        old_data = self._data_for_screening["transactions"]
         yesterday = past_date(0)
         
         if yesterday not in old_data["Date"]:
-            self._transactions["transactions"] = refresh_data(
+            self._data_for_screening["transactions"] = refresh_data(
                 get_recent_data(old_data,window_length),
-                self._spreadsheet[sheet], 
+                self._transactions[sheet], 
                 days_ago = 0
             )
          
     def _get_types(self) -> dict:
-        ''' Returns types of violations to look for'''
+        ''' Return types of violations to look for'''
         return get_types()
         
-    def _generated_alerts(self, violations_type: str)-> bool:
+    def _get_rules(self) -> jdict:
+        ''' Returns rules for detecting violations'''
+        return extract_rules(self._transactions["Rules engine"])
+        
+    def _generated_alerts(self, rules: jdict, violations_type: str)-> bool:
         ''' Checking limit violations and storing alerts. Returns bool - was anything found '''
         
         limit_violations = detect_limit_violations(
-            self._transactions["transactions"],
-            self._spreadsheet["Rules engine"],
+            self._data_for_screening["transactions"],
+            rules,
             violations_type
         )
         

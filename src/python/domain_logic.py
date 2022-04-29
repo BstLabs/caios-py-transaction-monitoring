@@ -75,18 +75,18 @@ def check_exchanged(data: pd.DataFrame, limit: int)-> pd.DataFrame:
     data = get_pairs(data)
     return group_and_check(data,limit,"between")
     
-def screen_data(screening_type: str, data: pd.DataFrame, limit: int) -> pd.DataFrame:
-    ''' maps usecase to a search function and runs the function '''
-    functions = jdict(
+SCREENING_FUNCTIONS = dict(
         single = check_single,
         sum_recieved = check_sum,
         exchange = check_exchanged
     )
-    check = functions[screening_type]
+    
+def screen_data(screening_type: str, data: pd.DataFrame, limit: int) -> pd.DataFrame:
+    ''' maps usecase to a search function and runs the function '''
+    check = SCREENING_FUNCTIONS[screening_type]
     return check(data, limit)
     
-def detect_limit_violations(data: pd.DataFrame, rules: pd.DataFrame, violations_type: str):
-    rules = extract_rules(rules)
+def detect_limit_violations(data: pd.DataFrame, rules: jdict, violations_type: str):
     return screen_data(
         violations_type, 
         get_recent_data(
@@ -98,11 +98,8 @@ def detect_limit_violations(data: pd.DataFrame, rules: pd.DataFrame, violations_
     
 def build_results(violations_flags: list) -> jdict:
     ''' Returns result of the search '''
-    if any(violations_flags):
-        return jdict(
-            result = "Alerts found", 
-            detected = jdict(zip(["single","sum_recieved","exchange"],violations_flags))
-        )
-    else:
-        return jdict(result = "No alerts")
+    return jdict(
+        result = "Alerts found", 
+        detected = jdict(zip(["single","sum_recieved","exchange"],violations_flags))
+    ) if any(violations_flags) else jdict(result = "No alerts")
     

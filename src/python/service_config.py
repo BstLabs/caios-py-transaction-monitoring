@@ -45,7 +45,7 @@ def get_configuration(service_name: str, mode: str) -> tuple[jdict, ...]:
             interface='CronJob',
             expressions = (
                 jdict(
-                    expression="0/1 * * * ? *", 
+                    expression="0 1 * * ? *", 
                     target=TransactionMonitoring._check_transactions,
                     args=dict(
                         recipient="recipient email",
